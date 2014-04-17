@@ -1,0 +1,115 @@
+<?php
+
+// $Id$
+
+/**
+ * @file
+ * Lets users add private annotations to nodes.
+ *
+ * Adds a text field when a node is displayed
+ * so that authenticated users may make notes.
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function annotate_menu() {
+  $items['admin/settings/annotate'] = array(
+    'title' => 'Annotation settings',
+    'description' => 'Change how annotations behave',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('annotate_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'annotate.admin.inc',
+  );
+  
+  return $items;
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function annotate_nodeapi(&$node, $op, $teaser, $page) {
+  global $user;
+  switch ($op) {
+    // The 'view' operation means the node is about to be displayed.
+    case 'view':
+      // Abort if the user is an anonymous user (not logged in) or
+      // if the node is not being displayed on a page by itself
+      // (for example, it could be in a node listing or search result).
+      if ($user->uid == 0 || !$page) {
+        break;
+      }
+      // Find out which node types we should annotate.
+      $types_to_annotate = variable_get('annotate_nodetypes', array('page'));
+      
+      // Abort if this node is not one of the types we should annotate.
+      if (!in_array($node->type, $types_to_annotate)) {
+        break;
+      }
+      
+      // Get the current annotation for this node from the database
+      // and store it in the node object.
+      $result = db_query('SELECT note FROM {annotations} WHERE nid = %d AND uid = %d', $node->nid, $user->uid);
+      $node->annotation = db_result($result);
+
+      // Add our form as a content item.
+      $node->content['annotation_form'] = array(
+        '#value' => drupal_get_form('annotate_entry_form', $node),
+        '#weight' => 10
+      );
+      break;
+      
+    case 'delete':
+      db_query('DELETE FROM {annotations} WHERE nid = %d', $node->nid);
+      break;
+  }
+}
+
+/** 
+ * Define the form for entering an annotation. 
+ */ 
+function annotate_entry_form($form_state, $node) {
+  // Define a fieldset.
+  $form['annotate'] = array( 
+    '#type' => 'fieldset', 
+    '#title' => t('Annotations') 
+  ); 
+  
+  // Define a textarea inside the fieldset.
+  $form['annotate']['note'] = array( 
+    '#type' => 'textarea', 
+    '#title' => t('Notes'), 
+    '#default_value' => isset($node->annotation) ? $node->annotation : '', 
+    '#description' => t('Make your personal annotations about this content here. Only you (and the site administrator) will be able to see them.') 
+  );
+  
+  // For convenience, save the node id.
+  $form['annotate']['nid'] = array( 
+    '#type' => 'value', 
+    '#value' => $node->nid 
+  );
+  
+  // Define a submit button.
+  $form['annotate']['submit'] = array( 
+    '#type' => 'submit', 
+    '#value' => t('Update') 
+  ); 
+  return $form; 
+} 
+
+/**
+ * Handle submission of the annotation form and saving
+ * of the data to the database.
+ */
+function annotate_entry_form_submit($form, $form_state) {
+  global $user;
+  
+  $note = $form_state['values']['note'];
+  $nid = $form_state['values']['nid'];
+  
+  db_query('DELETE FROM {annotations} WHERE nid = %d AND uid = %d', $nid, $user->uid);
+  db_query("INSERT INTO {annotations} (nid, uid, note, created) VALUES (%d, %d, '%s', %d)", $nid, $user->uid, $note, time());
+  drupal_set_message(t('Your annotation has been saved.'));
+}

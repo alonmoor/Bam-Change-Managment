@@ -1,0 +1,5 @@
+; $Id$
+name = Annotate
+description = Allows users to annotate nodes.
+core = 6.x
+package = Pro Drupal Development

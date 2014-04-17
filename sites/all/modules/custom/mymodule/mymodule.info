@@ -1,0 +1,3 @@
+name = My Module
+core = 7.x
+dependencies[]=ctools

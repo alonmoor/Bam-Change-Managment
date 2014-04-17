@@ -1,0 +1,4 @@
+name = My Custom Panes
+description = Provides several custom panes to panels.
+core = 7.x
+dependencies[] = ctools

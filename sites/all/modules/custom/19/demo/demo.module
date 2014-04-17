@@ -1,0 +1,39 @@
+<?php
+
+/*
+ * Implements hook_form_alter().
+ */
+function demo_form_alter(&$form, &$form_state, $form_id) {
+  #krumo($form_id);
+  switch ($form_id) {
+    case 'user_profile_form' :
+      
+      $form['account']['pass']['#description'] = t('To change the current user password, enter the new password in both fields. Please do not use common passwords like "password", "12345", "love".');
+      #krumo($form);
+
+    break;
+  }
+}
+
+
+/*
+ * Implement hook_form_FORM_ID_alter().
+ */
+function demo_form_user_register_form_alter(&$form, &$form_state, $form_id) {
+
+  $form['account']['pass']['#description'] = t('To change the current user password, enter the new password in both fields. Please do not use common passwords like "password", "12345", "love".');
+  $form['#validate'][] = 'demo_validate_password';
+  #krumo($form);
+}
+
+
+/*
+ * Custom password validation
+ */
+function demo_validate_password($form, &$form_state) {
+  $badpasswords = array('password', '12345', 'love');
+  if (in_array($form_state['values']['pass'],  $badpasswords)) {
+    form_set_error('pass', t('Please use a more secure password.'));
+  }
+  #krumo($form_state);
+}

@@ -1,0 +1,4 @@
+name = Menu Mangler
+description = Example of implementing hook_page_alter().
+core = 7.x
+dependencies[] = menu_magic

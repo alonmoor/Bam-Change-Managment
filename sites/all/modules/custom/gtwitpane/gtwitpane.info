@@ -1,0 +1,5 @@
+name = Ghetto Twitter Pane
+description = Provides a ghetto twitter pane to panels
+core = 7.x
+dependencies[] = ctools
+files[] = gtwitpane.module
