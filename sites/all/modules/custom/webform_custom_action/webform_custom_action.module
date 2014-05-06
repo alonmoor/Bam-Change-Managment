@@ -1,0 +1,168 @@
+<?php
+/**
+ * @file
+ * Custom Webform submission action module.
+ */
+
+/**
+ * Implements hook_webform_submission_actions().
+ */
+function webform_custom_action_webform_submission_actions($node, $submission) {
+  $actions = array();
+
+  // Does this submission already have Declined status?
+  $declined = FALSE;
+  if (isset($submission->data[19]['value'][0])) {
+    if ($submission->data[19]['value'][0] == 'Declined') {
+      $declined = TRUE;
+    }
+  }
+
+  // Show action if user has results access and submission not already declined.
+  if (webform_results_access($node) && !$declined) {
+    $actions['declined'] = array(
+      'title' => t('Decline speaker'),
+      'href' => 'node/' . $node->nid . '/submission/' . $submission->sid . '/declined',
+      'query' => drupal_get_destination(),
+    );
+  }
+
+  return $actions;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function webform_custom_action_menu(){
+  $items = array();
+  $items['node/%webform_menu/submission/%webform_menu_submission/declined'] = array(
+    'title' => 'Decline speaker',
+    'load arguments' => array(1),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('webform_custom_action_speaker_declined', 1, 3),
+    'access callback' => 'webform_results_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Form confirming the declining of a speakers presentation.
+ */
+function webform_custom_action_speaker_declined($form, $form_state, $node, $submission) {
+  // Get submitted speaker name and surname.
+  $speaker_name = $submission->data[1]['value'][0] . ' ' . $submission->data[2]['value'][0];
+  // Get submitted presentation title.
+  $presentation_title = $submission->data[4]['value'][0];
+
+  // Render the admin UI breadcrumb.
+  webform_set_breadcrumb($node, $submission);
+
+  $form['#tree'] = TRUE;
+  $form['#node'] = $node;
+  $form['#submission'] = $submission;
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['text'] = array('#markup' => '<p>' . t('Are you sure you want to Decline this speaker application: <em>' . $speaker_name . ' - ' . $presentation_title . '</em>?') . '</p>');
+
+  $form['actions']['declined'] = array(
+    '#type' => 'submit',
+    '#value' => t('Decline speaker application'),
+  );
+
+  $form['actions']['cancel'] = array(
+    '#type' => 'markup',
+    '#markup' => l(t('Cancel'), isset($_GET['destination']) ? $_GET['destination'] : 'node/' . $node->nid . '/submission/' . $submission->sid),
+  );
+  return $form;
+}
+
+/**
+ * Submit function for the decline speaker form.
+ */
+function webform_custom_action_speaker_declined_submit($form, &$form_state) {
+  // Retrieve node and submission.
+  $node = $form_state['build_info']['args'][0];
+  $submission = $form_state['build_info']['args'][1];
+
+  // Set Status as declined.
+  $submission->data[19]['value'][0] = 'Declined';
+
+  // Update the submission.
+  if (webform_submission_update($node, $submission)) {
+    drupal_set_message(t('Speaker application declined.'));
+  }
+  else {
+    drupal_set_message(t('Could not decline this speaker application.'), 'error');
+    return;
+  }
+
+  // Send notification email.
+  webform_custom_action_speaker_status_email($submission);
+}
+
+/**
+ * Build and send notification email.
+ */
+function webform_custom_action_speaker_status_email($submission) {
+  // Get some of the submitted data.
+  $speaker_name = $submission->data[1]['value'][0] . ' ' . $submission->data[2]['value'][0];
+  $to_email_address = $submission->data[3]['value'][0];
+  $presentation_title = $submission->data[4]['value'][0];
+
+  // Find out if html emails are possible.
+  $html_capable = webform_email_html_capable();
+
+  // Build email body as html.
+  $body = "<p>Dear $speaker_name,</p>";
+  $body .= "<p>We regret to inform that your presentation entitled '$presentation_title' can not be included in the programme of the Fictitious Conference this year.</p>";
+  $body .= "<p>Thank you once again for your interest and we look forward to considering your participation at our next conference.</p>";
+  $body .= "<p>Kind regards,</p>";
+  $body .= "<p>Fictitious Conference Organizers.</p>";
+
+  if ($html_capable) {
+    // Apply some css to the html.
+    $body = "<div style='font-family: Arial, Helvetica; font-size: 10pt;'>" . $body . "</div>";
+  }
+  else {
+    // Convert the html to plaintext.
+    $body = str_replace('<p>', '', $body);
+    $body = str_replace('</p>', "\r\n\r\n", $body);
+  }
+
+  // Set email parameters.
+  $language = language_default();
+  $mail_params = array(
+    'message' => $body,
+    'subject' => t('Speaker application for the Fictitious Conference'),
+    'headers' => array(),
+    'plain' => !$html_capable,
+    'html' => $html_capable,
+  );
+  $mail_params['plaintext'] = $html_capable ? NULL : $body;
+  if ($html_capable) {
+    // MIME Mail requires this header or it will filter all text.
+    $mail_params['headers']['Content-Type'] = 'text/html; charset=UTF-8';
+  }
+
+  // Send the email.
+  $message = drupal_mail('webform_custom_action', 'declined', $to_email_address, $language, $mail_params);
+
+  // Notify user that mail was sent.
+  if ($message['result']) {
+    drupal_set_message(t('Speaker declined notification email sent.'));
+  }
+  else {
+    drupal_set_message(t('Unable to send speaker declined notification email to <em>@email</em>. Contact the website administrator.', array('@email' => $to_email_address)), 'error');
+  }
+}
+
+/**
+ * Implements hook_mail()
+ */
+function webform_custom_action_mail($key, &$message, $mail_params) {
+  $message['headers'] = array_merge($message['headers'], $mail_params['headers']);
+  $message['subject'] = $mail_params['subject'];
+  $message['body'][] = $mail_params['message'];
+}

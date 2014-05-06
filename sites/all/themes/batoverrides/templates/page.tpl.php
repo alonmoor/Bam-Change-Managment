@@ -238,7 +238,7 @@
 
     <?php if ($page['footer']): ?>
       <div id="footer" class="clearfix">
-        <?php print render($page['footer']); ?>
+        <?php print $footer_message; ?>
       </div> <!-- /#footer -->
     <?php endif; ?>
 

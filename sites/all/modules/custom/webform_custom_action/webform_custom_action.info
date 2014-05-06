@@ -1,0 +1,6 @@
+name = Webform Custom Action
+description = Custom actions for Webform submissions.
+core = 7.x
+package = Webform
+dependencies[] = webform
+
