@@ -40,6 +40,11 @@ function input_menu() {
         'access callback' => TRUE,
         'type' => MENU_CALLBACK,
     );
+    $items['input/search-history-delete'] = array(
+        'title' => 'Delete search history',
+        'page callback' => 'input_search_history_delete_page',
+        'access callback' => TRUE,
+    );
 
     return $items;
 }
@@ -64,7 +69,7 @@ function input_simple_form($form, &$form_submit) {
 
 
 /**
- * Page demonstrating embedding a form on a page.
+ * Menu callback; page demonstrating embedding a form on a page.
  */
 function input_simple_page() {
     $build = array(
@@ -103,7 +108,7 @@ function input_simple_form_submit($form, &$form_state) {
 /**
  * A longer form with more elements and attributes.
  */
-function input_more_form($form, &$form_state) {
+function input_more_form($form, &$form_submit) {
 
     $form['computer'] = array(
         '#title' => t('Do you own a computer?'),
@@ -112,6 +117,7 @@ function input_more_form($form, &$form_state) {
         '#required' => TRUE,
     );
 
+    // Demonstrating a fieldset.
     $form['computer_stats'] = array(
         '#title' => 'Computer stats',
         '#type' => 'fieldset',
@@ -141,44 +147,16 @@ function input_more_form($form, &$form_state) {
         ),
     );
 
-    // Added AJAX callback.
-    $form['computer_stats']['os'] = array(
-        '#title' => t('Operating system'),
-        '#type' => 'select',
-        '#options' => drupal_map_assoc(array('', t('OSX'), t('Linux'), t('Windows'))),
-        '#ajax' => array(
-            'callback' => 'input_os_verify_ajax_callback',
-            'wrapper' => 'input_os_verify_wrapper',
-        ),
-    );
-
-    // Setting an empty element with a wrapper to be populated.
-    $form['computer_stats']['os_verify'] = array(
+    $form['help'] = array(
         '#type' => 'markup',
-        '#prefix' => '<div id="input_os_verify_wrapper">',
-        '#suffix' => '</div>',
+        '#markup' => '<p>' . t('For more information about elements and attributes, see the <a href="!url">Form API reference page</a>', array('!url' => url('http://api.drupal.org/api/drupal/developer--topics--forms_api_reference.html/7'))) . '.</p>',
     );
-
-    // When submitted, check for value of OS, and populate os_verify.
-    if (isset($form_state['values']['os'])) { // Fixed this line, was throwing an error in the original video code.
-        $form['computer_stats']['os_verify']['#type'] = 'checkbox';
-        $form['computer_stats']['os_verify']['#title'] = t('Are you sure you are using @os?', array('@os' => $form_state['values']['os']));
-    }
-
     $form['submit'] = array(
         '#type' => 'submit',
         '#value' => t('Submit'),
     );
 
     return $form;
-}
-
-
-/**
- * AJAX callback for OS verification.
- */
-function input_os_verify_ajax_callback($form, $form_state) {
-    return $form['computer_stats']['os_verify'];
 }
 
 
@@ -198,6 +176,10 @@ function input_form_alter(&$form, &$form_state, $form_id) {
             // user/autocomplete - Autocompletes usernames
             // taxonomy/autocomplete - Autocompletes taxonomy terms as a comma-separated list
             $form['search_block_form']['#autocomplete_path'] = 'input/search-autocomplete';
+            $form['clear'] = array(
+                '#type' => 'markup',
+                '#markup' => '<div style="float:left">' . l(t('Clear history'), 'input/search-history-delete', array('query' => array('destination' => 'input/examples'))) . '</div>',
+            );
             break;
     }
     return;
@@ -234,4 +216,34 @@ function input_search_autocomplete($string = '') {
         }
     }
     drupal_json_output($matches);
+}
+
+
+/**
+ * Menu callback; get confirm form for deleting search history.
+ */
+function input_search_history_delete_page() {
+    return drupal_get_form('input_search_history_delete_confirm');
+}
+
+
+/**
+ * Build a confirm form for deletion of search history.
+ */
+function input_search_history_delete_confirm($form, &$form_state) {
+    $caption = '<p>' . t('This action cannot be undone.') . '</p>';
+    $heading = t('Are you sure you want to clear the search history?');
+    $cancel_path = 'input/examples';
+    $yes = t('Delete history');
+    $no = t('Cancel');
+    return confirm_form($form, $heading, $cancel_path, $caption, $yes, $no);
+}
+
+
+/**
+ * Submit function for the confirm deletion form.
+ */
+function input_search_history_delete_confirm_submit($form, &$form_state) {
+    variable_del('input_search_history');
+    drupal_set_message('The search history has been cleared.');
 }
