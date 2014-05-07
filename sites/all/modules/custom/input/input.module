@@ -1,5 +1,5 @@
 <?php
-// $Id$ -7
+// $Id$
 
 /**
  * @file
@@ -34,6 +34,13 @@ function input_menu() {
         'access callback' => TRUE,
         'weight' => 1,
     );
+    $items['input/search-autocomplete'] = array(
+        'description' => 'A callback for our search autocomplete.',
+        'page callback' => 'input_search_autocomplete',
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK,
+    );
+
     return $items;
 }
 
@@ -159,6 +166,11 @@ function input_form_alter(&$form, &$form_state, $form_id) {
     switch ($form_id) {
         case 'search_block_form':
             $form['#submit'][] = 'input_search_submit';
+
+            // A couple built-in autocomplete paths you can use:
+            // user/autocomplete - Autocompletes usernames
+            // taxonomy/autocomplete - Autocompletes taxonomy terms as a comma-separated list
+            $form['search_block_form']['#autocomplete_path'] = 'input/search-autocomplete';
             break;
     }
     return;
@@ -176,4 +188,23 @@ function input_search_submit($form, &$form_state) {
     $search_history[] = $phrase;
     variable_set('input_search_history', $search_history);
     drupal_set_message(t('Your search phrase %phrase has been saved to history.', array('%phrase' => $phrase)));
+}
+
+
+/**
+ * Menu callback; Retrieve a JSON object containing autocomplete suggestions for search.
+ *
+ * This loops through the 'input_search_history' variable and finds matches to currently
+ * typed search phrase. Then, drupal_json_output is called to format the result as json,
+ * which the autocomplete script expects.
+ */
+function input_search_autocomplete($string = '') {
+    $matches = array();
+    $search_history = variable_get('input_search_history', array());
+    foreach ($search_history as $phrase) {
+        if (stristr($phrase, $string)) {
+            $matches[$phrase] = $phrase;
+        }
+    }
+    drupal_json_output($matches);
 }

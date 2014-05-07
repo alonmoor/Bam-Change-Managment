@@ -1,5 +1,0 @@
-name = Blog Feature Override
-description = Example of overriding components in a feature.
-package = Build a Module
-core = 7.x
-files[] = blogoverride.module
